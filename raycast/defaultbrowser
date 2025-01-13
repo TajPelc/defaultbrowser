@@ -1,0 +1,54 @@
+#!/usr/bin/osascript
+
+# Required parameters:
+# @raycast.schemaVersion 1
+# @raycast.title Toggle Default Browser
+# @raycast.mode silent
+# @raycast.packageName Browser
+# Optional parameters:
+# @raycast.icon 🔄
+
+set currentBrowser to (do shell script "defaultbrowser --which")
+set targetBrowser to ""
+
+if currentBrowser is "chrome" then
+  set targetBrowser to "safari"
+else
+  set targetBrowser to "chrome"
+end if
+
+set repeatCount to 0
+tell application "System Events"
+  try
+    my changeDefaultBrowser(targetBrowser)
+    repeat until button 2 of window 1 of process "CoreServicesUIAgent" exists
+      delay 0.01
+      set repeatCount to repeatCount + 1
+      if repeatCount = 15 then exit repeat
+    end repeat
+    try
+      if targetBrowser is "safari" then
+        click button 1 of window 1 of process "CoreServicesUIAgent"
+        log "Safari is now your default browser"
+      else
+        click button 2 of window 1 of process "CoreServicesUIAgent"
+        log "Chrome is now your default browser"
+      end if
+    on error
+      log "Browser is already set to " & targetBrowser
+    end try
+  on error
+    log "The \"defaultbrowser\" CLI tool is required or an error occured."
+  end try
+end tell
+
+to changeDefaultBrowser(browser)
+  do shell script "
+  if ! command -v defaultbrowser &> /dev/null; then
+    exit 1
+  fi
+  defaultbrowser " & browser & "
+  exit 0
+  "
+end changeDefaultBrowser
+
