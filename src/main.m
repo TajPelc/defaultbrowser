@@ -1,83 +1,58 @@
-//
 //  main.m
 //  defaultbrowser
 //
 
 #import <Foundation/Foundation.h>
-#import <ApplicationServices/ApplicationServices.h>
+#import <AppKit/AppKit.h>
 
-NSString* app_name_from_bundle_id(NSString *app_bundle_id) {
-    return [[[app_bundle_id componentsSeparatedByString:@"."] lastObject] lowercaseString];
-}
-
-NSMutableDictionary* get_http_handlers() {
-    NSArray *handlers =
-      (__bridge NSArray *) LSCopyAllHandlersForURLScheme(
-        (__bridge CFStringRef) @"http"
-      );
-
-    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
-
-    for (int i = 0; i < [handlers count]; i++) {
-        NSString *handler = [handlers objectAtIndex:i];
-        dict[app_name_from_bundle_id(handler)] = handler;
-    }
-
-    return dict;
-}
-
-NSString* get_current_http_handler() {
-    NSString *handler =
-        (__bridge NSString *) LSCopyDefaultHandlerForURLScheme(
-            (__bridge CFStringRef) @"http"
-        );
-
-    return app_name_from_bundle_id(handler);
-}
-
-void set_default_handler(NSString *url_scheme, NSString *handler) {
-    LSSetDefaultHandlerForURLScheme(
-        (__bridge CFStringRef) url_scheme,
-        (__bridge CFStringRef) handler
-    );
+NSString* get_app_name(NSString *bundleId) {
+    return [[[bundleId componentsSeparatedByString:@"."] lastObject] lowercaseString];
 }
 
 int main(int argc, const char *argv[]) {
-    const char *target = (argc == 1) ? '\0' : argv[1];
+    const char *target = (argc == 1) ? NULL : argv[1];
 
     @autoreleasepool {
-        // Get all HTTP handlers
-        NSMutableDictionary *handlers = get_http_handlers();
+        NSWorkspace *workspace = [NSWorkspace sharedWorkspace];
+        NSURL *testURL = [NSURL URLWithString:@"http://"];
+        
+        // Get all browsers
+        NSMutableDictionary *browsers = [NSMutableDictionary dictionary];
+        for (NSURL *appURL in [workspace URLsForApplicationsToOpenURL:testURL]) {
+            NSString *bundleId = [[NSBundle bundleWithURL:appURL] bundleIdentifier];
+            if (bundleId) {
+                browsers[get_app_name(bundleId)] = bundleId;
+            }
+        }
+        
+        // Get current default browser
+        NSURL *defaultAppURL = [workspace URLForApplicationToOpenURL:testURL];
+        NSString *currentDefault = defaultAppURL ? get_app_name([[NSBundle bundleWithURL:defaultAppURL] bundleIdentifier]) : nil;
 
-        // Get current HTTP handler
-        NSString *current_handler_name = get_current_http_handler();
-
-        if (target == '\0') {
-            // List all HTTP handlers, marking the current one with a star
-            for (NSString *key in handlers) {
-                char *mark = [key caseInsensitiveCompare:current_handler_name] == NSOrderedSame ? "* " : "  ";
-                printf("%s%s\n", mark, [key UTF8String]);
+        if (target == NULL) {
+            // List browsers
+            for (NSString *name in browsers) {
+                printf("%s%s\n", [name isEqualToString:currentDefault] ? "* " : "  ", [name UTF8String]);
             }
         } else {
-            NSString *target_handler_name = [NSString stringWithUTF8String:target];
+            NSString *targetName = [NSString stringWithUTF8String:target];
+            NSString *targetBundleId = browsers[targetName];
 
-            if ([target_handler_name caseInsensitiveCompare:current_handler_name] == NSOrderedSame) {
-              printf("%s is already set as the default HTTP handler\n", target);
-            } else {
-                NSString *target_handler = handlers[target_handler_name];
-
-                if (target_handler != nil) {
-                    // Set new HTTP handler (HTTP and HTTPS separately)
-                    set_default_handler(@"http", target_handler);
-                    set_default_handler(@"https", target_handler);
-                } else {
-                    printf("%s is not available as an HTTP handler\n", target);
-
-                    return 1;
+            if ([targetName isEqualToString:currentDefault]) {
+                printf("%s is already the default browser\n", target);
+            } else if (targetBundleId) {
+                // Set as default for both HTTP and HTTPS
+                for (NSString *scheme in @[@"http", @"https"]) {
+                    LSSetDefaultHandlerForURLScheme(
+                        (__bridge CFStringRef)scheme,
+                        (__bridge CFStringRef)targetBundleId
+                    );
                 }
+            } else {
+                printf("%s is not available as a browser\n", target);
+                return 1;
             }
         }
     }
-
     return 0;
 }
