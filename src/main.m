@@ -29,7 +29,12 @@ int main(int argc, const char *argv[]) {
         NSURL *defaultAppURL = [workspace URLForApplicationToOpenURL:testURL];
         NSString *currentDefault = defaultAppURL ? get_app_name([[NSBundle bundleWithURL:defaultAppURL] bundleIdentifier]) : nil;
 
-        if (target == NULL) {
+        if (target != NULL && strcmp(target, "--which") == 0) {
+            if (currentDefault) {
+                printf("%s\n", [currentDefault UTF8String]);
+            }
+            return 0;
+        } else if (target == NULL) {
             // List browsers
             for (NSString *name in browsers) {
                 printf("%s%s\n", [name isEqualToString:currentDefault] ? "* " : "  ", [name UTF8String]);
