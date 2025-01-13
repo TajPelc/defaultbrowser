@@ -1,6 +1,6 @@
 # defaultbrowser
 
-Command line tool for setting the default browser (HTTP handler) in macOS X.
+Command line tool for setting the default browser (HTTP handler) in MacOS.
 
 ## Install
 
